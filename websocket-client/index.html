@@ -14,7 +14,7 @@
         .container {
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: 90vh;
         }
         .status {
             margin-bottom: 10px;
@@ -83,10 +83,27 @@
         }
         .message-container {
             flex-grow: 1;
-            overflow-y: auto;
+            overflow-y: scroll;
             border: 1px solid #ddd;
             padding: 10px;
             margin-bottom: 10px;
+            border-radius: 4px;
+            scrollbar-width: thin;
+            scrollbar-color: #007bff #f0f0f0;
+        }
+        
+        /* 为 Webkit 浏览器（Chrome、Safari等）定制滚动条样式 */
+        .message-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .message-container::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        
+        .message-container::-webkit-scrollbar-thumb {
+            background-color: #007bff;
             border-radius: 4px;
         }
         .message {

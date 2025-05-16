@@ -162,7 +162,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client_manager = Arc::new(TcpClientManager::new());
     
     // 设置TCP服务器监听地址和端口
-    let tcp_addr = "127.0.0.1:8080".to_string();
+    let tcp_addr = "0.0.0.0:8080".to_string();
     let tcp_listener = TcpListener::bind(&tcp_addr).await?;
     println!("TCP服务器正在监听 {}...", &tcp_addr);
     
@@ -338,13 +338,14 @@ async fn read_from_tcp(socket: &mut TcpStream, buffer: &[u8]) -> Result<Value, B
         }
         Ok(_) => {
             // 成功读取长度字段
-            let data_len = BigEndian::read_u32(&len_bytes) as usize;
+            let data_len = (BigEndian::read_u32(&len_bytes) as usize) - 4;
             
             // 确保数据长度合理，防止恶意请求
             if data_len > buffer.len() {
                 return Err("数据包太大".into());
             }
             
+            println!("收到数据长度: {}", data_len);
             // 读取JSON数据
             let mut data_buffer = vec![0u8; data_len];
             socket.read_exact(&mut data_buffer).await?;
@@ -360,6 +361,7 @@ async fn read_from_tcp(socket: &mut TcpStream, buffer: &[u8]) -> Result<Value, B
         }
         Err(e) => {
             // 读取错误，可能是客户端断开连接
+            println!("读取数据失败: {}", e);
             Err(e.into())
         }
     }
@@ -571,7 +573,7 @@ async fn send_response(socket: &mut TcpStream, response: &Value) -> Result<(), B
     
     // 创建长度前缀
     let mut len_bytes = [0u8; 4];
-    BigEndian::write_u32(&mut len_bytes, data_len);
+    BigEndian::write_u32(&mut len_bytes, data_len + 4);
     
     // 发送长度前缀
     socket.write_all(&len_bytes).await?;
