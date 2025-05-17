@@ -271,10 +271,10 @@ async fn handle_tcp_client(mut socket: TcpStream, queue: Arc<MessageQueue>, addr
                         println!("从TCP客户端 {} (ID={}) 收到数据: {}", addr, client_id, json_data);
                         
                         // 处理数据并发送响应
-                        let response = process_data(json_data.clone());
-                        if let Err(e) = send_response(&mut socket, &response).await {
-                            break Err(e);
-                        }
+                        // let response = process_data(json_data.clone());
+                        // if let Err(e) = send_response(&mut socket, &response).await {
+                        //     break Err(e);
+                        // }
                         
                         // 将数据发送到消息队列，以便WebSocket客户端可以接收
                         let mut enriched_data = json_data.clone();
@@ -510,9 +510,19 @@ async fn process_ws_messages(mut ws_receiver: impl StreamExt<Item = Result<Messa
                                             json_data.get("target_id").and_then(|v| v.as_str()),
                                             json_data.get("payload")
                                         ) {
+                                            // 如果payload是字符串，尝试解析为JSON
+                                            let data = if let Some(payload_str) = payload.as_str() {
+                                                match serde_json::from_str::<Value>(payload_str) {
+                                                    Ok(parsed) => parsed,
+                                                    Err(_) => payload.clone(),
+                                                }
+                                            } else {
+                                                payload.clone()
+                                            };
+
                                             let ws_to_tcp_msg = MessageType::WsToTcp {
                                                 target_id: target_id.to_string(),
-                                                data: payload.clone(),
+                                                data,
                                             };
                                             
                                             if let Err(e) = queue.ws_to_tcp_sender.send(ws_to_tcp_msg).await {
@@ -567,8 +577,14 @@ fn process_data(data: Value) -> Value {
 
 // 发送响应给客户端
 async fn send_response(socket: &mut TcpStream, response: &Value) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // 将响应序列化为JSON字符串
-    let json_data = serde_json::to_vec(response)?;
+    // 如果响应是字符串，直接发送字符串内容，不添加引号
+    let json_data = if let Some(s) = response.as_str() {
+        s.as_bytes().to_vec()
+    } else {
+        // 否则，将响应序列化为JSON字符串
+        serde_json::to_vec(response)?
+    };
+    
     let data_len = json_data.len() as u32;
     
     // 创建长度前缀
@@ -578,7 +594,7 @@ async fn send_response(socket: &mut TcpStream, response: &Value) -> Result<(), B
     // 发送长度前缀
     socket.write_all(&len_bytes).await?;
     
-    // 发送JSON数据
+    // 发送数据
     socket.write_all(&json_data).await?;
     socket.flush().await?;
     
